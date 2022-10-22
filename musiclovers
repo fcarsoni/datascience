@@ -1,0 +1,278 @@
+from functools import cache
+from lib2to3.pgen2.token import NEWLINE
+import spotipy
+import spotipy.util as util
+from spotipy.oauth2 import SpotifyOAuth
+from spotipy.oauth2 import SpotifyClientCredentials
+import pandas as pd
+import time
+import json
+import cred
+import os
+from decimal import Decimal
+
+#CREATE environment variables
+os.environ['SPOTIPY_CLIENT_ID'] = cred.client_ID
+os.environ['SPOTIPY_CLIENT_SECRET'] = cred.client_SECRET
+os.environ['SPOTIPY_REDIRECT_URI'] = cred.redirect_url
+
+#DEFINE initial variables
+user1 = input("Enter first username: ")
+user2 = input("Enter second username: ")
+number_of_artists = 50
+
+#######################################################################################################################
+#DEFINE Client Credentials function 
+#RETURN Spotify Account
+def credentials(user):
+
+    scope = "user-library-read user-top-read"
+
+    try:
+        os.remove(f".cache-{user}")
+    except:
+        token = util.prompt_for_user_token(user,scope,show_dialog=True)
+    else:
+        token = util.prompt_for_user_token(user,scope,show_dialog=True)
+    
+    if token:
+        sp = spotipy.Spotify(auth=token)
+    else:
+        print("Can't get token for",user)
+
+    return sp
+#######################################################################################################################
+
+
+#######################################################################################################################
+#DEFINE Create JSON file for user data 
+def createJSON(user_top_artists,number):
+    for song in range(number_of_artists):
+        list = []
+        list.append(user_top_artists)
+        json_file = 'top_artists_data_user'+str(number)+'.json'
+        with open(json_file,'w') as top_artists:
+            json.dump(list,top_artists,ensure_ascii=False,indent=4)
+
+    with open(json_file) as top_artists_file:
+        data = json.load(top_artists_file)
+    
+    return data
+#######################################################################################################################
+
+
+#######################################################################################################################
+#DEFINE Parse JSON file for user data 
+def parseJSON(data,number):
+
+    results = data[0]["items"]
+    artist_names = []
+    artist_uri = []
+
+    for result in results:
+        artist_names.append(result["name"])
+        artist_uri.append(result["uri"])
+
+    top_artists = pd.DataFrame(
+        {
+            'artist':artist_names,
+            'artist_uri': artist_uri
+        }
+    )
+    
+    top_artists_saved = top_artists.to_csv('top_artists_user'+str(number)+'.csv')
+
+    return artist_names
+#######################################################################################################################
+
+
+lover1 = credentials(user1)
+lover1_top_artists = lover1.current_user_top_artists(limit=number_of_artists,offset=0,time_range="medium_term")
+data1 = createJSON(lover1_top_artists,1)
+artists1 = parseJSON(data1,1)
+
+lover2 = credentials(user2)
+lover2_top_artists = lover2.current_user_top_artists(limit=number_of_artists,offset=0,time_range="medium_term")
+data2 = createJSON(lover2_top_artists,2)
+artists2 = parseJSON(data2,2)
+
+
+similar_artists = []
+totalScore = 0
+maxScore = (number_of_artists*(number_of_artists+1))
+
+for artist in artists1:
+    if artist in artists2:
+        score1 = number_of_artists - artists1.index(artist)
+        score2 = number_of_artists - artists2.index(artist)
+        totalScore += score1 + score2
+        similar_artists.append(artist)
+
+percent_lover = int((totalScore/(maxScore/2)) * 100)
+
+if percent_lover > 100:
+    percent_lover = 100
+
+    
+print(similar_artists)
+print(totalScore)
+print("{} and {} are {}% MusicLovers".format(user1,user2,percent_lover))
+
+
+
+
+
+
+
+
+
+
+
+
+
+#CODE FOR OTHER PROGRAMS
+'''
+results = sp_account1.current_user_top_artists(limit=50,offset=0,time_range="medium_term")
+
+for song in range(50):
+    list = []
+    list.append(results)
+    with open('top50_data.json', 'w') as top_tracks:
+        json.dump(list,top_tracks,ensure_ascii=False,indent=4)
+
+with open('top50_data.json') as top_tracks:
+    data = json.load(top_tracks)
+
+results = data[0]["items"]
+artist_names = []
+artist_uri = []
+
+for result in results:
+    artist_names.append(result["name"])
+    artist_uri.append(result["uri"])
+
+top_artists = pd.DataFrame(
+    {
+        'artist':artist_names,
+        'artist_uri': artist_uri
+    }
+)
+    
+top_artists_saved = top_artists.to_csv('top50_artists.csv')
+
+
+
+'''
+
+'''
+
+results = data[0]["items"]
+artist_names = []
+artist_uri = []
+song_names = []
+song_uri = []
+albums = []
+popularity = []
+
+for result in results:
+    artist_names.append(result["artists"][0]["name"])
+    artist_uri.append(result["artists"][0]["uri"])
+    song_names.append(result["name"])
+    song_uri.append(result["uri"])
+    albums.append(result["album"]["name"])
+    popularity.append(result["popularity"])
+
+all_songs = pd.DataFrame(
+    {
+        'artist': artist_names,
+        'artist_uri': artist_uri,
+        'song_names': song_names,
+        'album': albums,
+        'popularity': popularity
+    }
+)
+
+all_songs_saved = all_songs.to_csv('top50_songs.csv')
+print(all_songs)
+
+'''
+
+'''
+sp_account1 = spotipy.Spotify(auth_manager=SpotifyOAuth(client_id=cred.client_ID,client_secret=cred.client_SECRET,redirect_uri=cred.redirect_url, scope=scope))
+#sp_account2 = spotipy.Spotify(auth_manager=SpotifyOAuth(client_id=cred.client_ID,client_secret=cred.client_SECRET,redirect_uri=cred.redirect_url, scope=scope))
+
+results_1 = sp_account1.current_user_top_tracks(limit=20,offset=0,time_range="medium_term")
+
+for idx, item in enumerate(results_1['items']):
+    artist = item['artists']
+    print(artist)
+    print(NEWLINE)
+
+'''
+
+
+
+
+
+'''
+
+client_credentials_manager = SpotifyClientCredentials(client_id,client_secret)
+sp = spotipy.Spotify(client_credentials_manager=client_credentials_manager)
+
+#########################################################
+#GET TRACK IDS FROM A USERS PLAYLISTS
+def getTrackIDs(user,playlist_id):
+    ids=[]
+    playlist = sp.user_playlist(user,playlist_id)
+    for item in playlist['tracks']['items']:
+        track = item['track']
+        ids.append(track['id'])
+    return ids
+#########################################################
+
+#########################################################
+#GET TRACK FEATURES FROM SPOTIFY TRACKS
+def getTrackFeatures(id):
+    meta = sp.track(id)
+    features = sp.audio_features(id)
+
+    #meta
+    name = meta['name']
+    album = meta['album']['name']
+    artist = meta['album']['artists'][0]['name']
+    release_date = meta['album']['release_date']
+    length = meta['duration_ms']
+    popularity = meta['popularity']
+
+    #features
+    acousticness = features[0]['acousticness']
+    danceability = features[0]['danceability']
+    energy = features[0]['energy']
+    instrumentalness = features[0]['instrumentalness']
+    liveness = features[0]['liveness']
+    loudness = features[0]['loudness']
+    speechiness = features[0]['speechiness']
+    tempo = features[0]['tempo']
+    time_signature = features[0]['time_signature']
+
+    track = [name,album,artist,release_date, length, popularity, acousticness, danceability, energy, instrumentalness, liveness, loudness, speechiness, tempo, time_signature]
+    return track
+###########################################################
+
+#Get the tracks from one of my playlists
+ids = getTrackIDs('frankiecarsonie','743pjCX4t6i5ffjeYoIgIu?si=db717fe0d59f4a74')
+
+#Loop over track IDs
+tracks = []
+for i in range(len(ids)):
+    time.sleep(.5)
+    track = getTrackFeatures(ids[i])
+    tracks.append(track)
+
+#Create DataSet
+df = pd.DataFrame(tracks, columns = ['name','album','artist','release_date','length','popularity','acousticness','danceability','energy','instrumentalness','liveness','loudness','speechiness','tempo','time_signature'])
+df.to_csv("/Users/frankiecarsonie/Desktop/Programs/spotify.csv", sep = ",")
+
+print (df)
+
+'''
